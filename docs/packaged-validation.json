@@ -1,0 +1,51 @@
+{
+  "code_commit": "a08a41ea952fe5df3115bf785434094566e56ee4",
+  "scope": "Operator-local packaged-image hardware test; not a public-base reproduction or musical-quality acceptance",
+  "image_id": "9f4156c071d2da38ede863a8080caa9f72fc102f65df8dba6635bbc51edecb66",
+  "base_image_id": "d4871978a155bc02a827f405012674979856e0ee2dc165e37ac8a094c1d9945e",
+  "request": "examples/request.json",
+  "torch": "2.13.0a0+rocm7.13.0a20260422",
+  "hip": "7.13.26154",
+  "env": {
+    "MIOPEN_FIND_MODE": "FAST",
+    "YUE2_AR_ATTENTION": "triton",
+    "YUE2_AR_LINEAR": "triton",
+    "YUE2_AR_NORM": "triton",
+    "YUE2_AR_FUSE_PROJECTIONS": "1"
+  },
+  "audio_seconds": 86.67866666666667,
+  "campaign_attempt_seconds": 138.4937646118924,
+  "nar_seconds": 40.51150983106345,
+  "vae_seconds": 10.52320226887241,
+  "sample_rate": 48000,
+  "truncated": {
+    "abc": false,
+    "semantic": false
+  },
+  "audio_sha256": "8db8d3ff82beb3c6da67664bbcd9f0017f57fbd280e29d379c4ef3023a8b11ef",
+  "weights": {
+    "mot": {
+      "files": {
+        "model.safetensors": {
+          "sha256": "1d55c42c1a9875c34f5d736e15078449992b044e807ce2a138e6cf289a1e59e9",
+          "bytes": 7261441640
+        }
+      },
+      "config_sha256": "ad3477bbef890bf98ae196c1e4b44779494a6231c4ab66f32708eabadf265329"
+    },
+    "vae": {
+      "files": {
+        "model.safetensors": {
+          "sha256": "807ce9d5149fa27c5ad3e6582058469852e908f6c5acc8c8aa338e7ab7751346",
+          "bytes": 530512720
+        }
+      },
+      "config_sha256": "f0191bb9694009956de44e0c361a6f1334760be4c8f848e599bde242a54a0970"
+    }
+  },
+  "campaign_identity_verified": true,
+  "hashes_verified": true,
+  "full_flac_decode_verified": true,
+  "subjective_listening_verified": false,
+  "ci_url": "https://github.com/CypherNaught-0x/yue2-gfx1151/actions/runs/34579776390"
+}

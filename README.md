@@ -163,6 +163,20 @@ shapes, include numerical gates and require explicit `--run-gpu`. Run them only
 with exclusive access; no GPU tests run automatically on generic GitHub runners.
 CPU passing does **not** establish kernel correctness on a new ROCm stack.
 
+## Packaged-image verification
+
+The reviewed installed package passed 38 CPU tests, 9 container-wrapper tests,
+and GitHub CI on Python 3.10/3.12. A separate GPU run in the rebuilt image produced
+the generic example to natural EOS: **86.679 seconds of 48 kHz stereo audio**,
+with both truncation flags false and campaign identity, artifact hashes and full
+FLAC decoding verified. Its recorded generation attempt was **138.494 seconds**
+(not total container startup/weight-hashing wall time). See
+[machine-readable evidence](docs/packaged-validation.json) and
+[container acceptance details](docs/container.md#reviewed-image-hardware-check).
+
+This validates the operator-local coherent base, **not a fresh publicly
+downloadable base**. Subjective listening is not claimed.
+
 ## License and attribution
 
 **CC BY-NC 4.0** for the YuE2 derivative; non-commercial only. See [LICENSE](LICENSE),
