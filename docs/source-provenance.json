@@ -1,0 +1,102 @@
+{
+  "upstream": "https://github.com/multimodal-art-projection/YuE",
+  "commit": "8e06871aa2e704d87ffb9bc71b5f5420f6813724",
+  "candidate": "release-candidate-2",
+  "files": {
+    "__init__.py": {
+      "sha256": "e35b3471f497934fe5dbe4aa615fc571b82e075b973fef3eebbe994368148ea8",
+      "upstream_sha256": "e35b3471f497934fe5dbe4aa615fc571b82e075b973fef3eebbe994368148ea8",
+      "modified": false
+    },
+    "ar_ops.py": {
+      "sha256": "21fd9e10332fa8643a9dfe58ac47040718204da5551a6629fa22bb864ef70e33",
+      "upstream_sha256": null,
+      "modified": true
+    },
+    "ar_triton.py": {
+      "sha256": "765d1777cd3bdfec26dc804cc7d4fe3fff65bf76ddab1c55e5679ea4f637eb2a",
+      "upstream_sha256": null,
+      "modified": true
+    },
+    "batch.py": {
+      "sha256": "e648fa49740af6752e5588d230a0bfcbb76b78bf8d30b0c8184f76fb527cc829",
+      "upstream_sha256": null,
+      "modified": true
+    },
+    "cli.py": {
+      "sha256": "c65c2c4b5af3b31303c237329b2f57f5f0efcfa5243decd69fbbfa215e21b819",
+      "upstream_sha256": "c65c2c4b5af3b31303c237329b2f57f5f0efcfa5243decd69fbbfa215e21b819",
+      "modified": false
+    },
+    "cuda_graph.py": {
+      "sha256": "95cb37251fd23b0fa5634a2f4c7a6e486bef25ea2d3ef8f1e5c4c6247127f208",
+      "upstream_sha256": "5e92b319f8cd9b02d32c794b8785cbabdbf45165bd2429ebba50748d5c1fd4a8",
+      "modified": true
+    },
+    "fast.py": {
+      "sha256": "e1722959ad0b0bf27eeaaf019cb9f109212a2450f03dd145866b1a0239151f38",
+      "upstream_sha256": "e1722959ad0b0bf27eeaaf019cb9f109212a2450f03dd145866b1a0239151f38",
+      "modified": false
+    },
+    "modeling_vae.py": {
+      "sha256": "f6fa1b077ca93248cb48fb9d8c52be5ba5f856dbe87eb3cdf5944809d6974510",
+      "upstream_sha256": "b6578ff461e6be9fd079ca5ddf12893940f3b3338ff3435fceae89c466486f5a",
+      "modified": true
+    },
+    "modeling_yue2.py": {
+      "sha256": "62d2bd758c8fff1a0d64584a699343076fca9a7880db5d8e19263bc30ae79d7c",
+      "upstream_sha256": "62d2bd758c8fff1a0d64584a699343076fca9a7880db5d8e19263bc30ae79d7c",
+      "modified": false
+    },
+    "nar.py": {
+      "sha256": "1a13a8e54b40229e008a270804a1fb830dfdf806735be484e8ce10171eb4b8d8",
+      "upstream_sha256": "1a13a8e54b40229e008a270804a1fb830dfdf806735be484e8ce10171eb4b8d8",
+      "modified": false
+    },
+    "pipeline.py": {
+      "sha256": "5a34098682ebf53b752e3af14b2d7e0e4dada7da0e034892f86b8077998e72fa",
+      "upstream_sha256": "5a34098682ebf53b752e3af14b2d7e0e4dada7da0e034892f86b8077998e72fa",
+      "modified": false
+    },
+    "progress.py": {
+      "sha256": "8de1fa588607dd0525aee37b652f44b17350689ad9e6ddcba8aaa8aaccf61b24",
+      "upstream_sha256": "8de1fa588607dd0525aee37b652f44b17350689ad9e6ddcba8aaa8aaccf61b24",
+      "modified": false
+    },
+    "protocol.py": {
+      "sha256": "e00d32bf22baac46c7d4dafaeecd4f3d5a4753d651b3dc8f4164b9f3774980ad",
+      "upstream_sha256": "e00d32bf22baac46c7d4dafaeecd4f3d5a4753d651b3dc8f4164b9f3774980ad",
+      "modified": false
+    },
+    "quantization.py": {
+      "sha256": "91e54fcd38a638727ebc05e240d2997097c541eec0cc18693fe429f702f38e78",
+      "upstream_sha256": "91e54fcd38a638727ebc05e240d2997097c541eec0cc18693fe429f702f38e78",
+      "modified": false
+    },
+    "sampling.py": {
+      "sha256": "b680afd5d6b6694b0e8d430b4c1b6d3b5108107672b06500ecc6645c471bf6c4",
+      "upstream_sha256": "b680afd5d6b6694b0e8d430b4c1b6d3b5108107672b06500ecc6645c471bf6c4",
+      "modified": false
+    },
+    "storage.py": {
+      "sha256": "a5bcc181b16412b45bc560e5264ba0b303667b5fd81957991ac0266c87fe2a5d",
+      "upstream_sha256": "a5bcc181b16412b45bc560e5264ba0b303667b5fd81957991ac0266c87fe2a5d",
+      "modified": false
+    },
+    "tokenization_yue2.py": {
+      "sha256": "fc88387f96e5db2020a0c3f5374b82726206026d83159b68b83e4136bb741acc",
+      "upstream_sha256": "fc88387f96e5db2020a0c3f5374b82726206026d83159b68b83e4136bb741acc",
+      "modified": false
+    },
+    "vae_kernels.py": {
+      "sha256": "ba114f9beb238c82167097dbe90da47e011baecb95e4f6565f7c8e2f68ff9712",
+      "upstream_sha256": null,
+      "modified": true
+    },
+    "vae_optimized.py": {
+      "sha256": "51ea543996bf668b08117b0a574460d9cbd58cc9e98e382892cfe7572ced7007",
+      "upstream_sha256": null,
+      "modified": true
+    }
+  }
+}

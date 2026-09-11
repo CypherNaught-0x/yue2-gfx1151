@@ -1,0 +1,32 @@
+# An explicitly selected, coherent gfx1151 ROCm/PyTorch base is required.
+# Use scripts/build-container.sh: it sends only a curated source context.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+USER root
+# Keep the base's matched Python/ROCm PATH and library paths, but never its
+# application checkout, command, current directory, or model-cache location.
+ENV PYTHONPATH="" \
+    PYTHONNOUSERSITE=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    HF_HOME=/tmp/yue2-cache/huggingface \
+    XDG_CACHE_HOME=/tmp/yue2-cache \
+    HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
+WORKDIR /usr/local/src/yue2-build
+COPY . .
+RUN python container/install.py && \
+    mkdir -p /usr/local/share/yue2-gfx1151 && \
+    cp LICENSE MODEL_LICENSE NOTICE.md THIRD_PARTY_NOTICES.md /usr/local/share/yue2-gfx1151/ && \
+    cp -R licenses /usr/local/share/yue2-gfx1151/ && \
+    cd / && rm -rf /usr/local/src/yue2-build
+WORKDIR /app
+RUN python -m yue2_gfx1151 --help && \
+    python -c "import yue2, yue2_gfx1151; print('Installed packages:', yue2.__file__, yue2_gfx1151.__file__); assert 'site-packages' in yue2.__file__; assert 'site-packages' in yue2_gfx1151.__file__"
+LABEL org.opencontainers.image.title="YuE2 gfx1151 compatibility port" \
+      org.opencontainers.image.description="Optional YuE2 non-commercial runtime; base selection and GPU validation are operator responsibilities" \
+      org.opencontainers.image.licenses="CC-BY-NC-4.0" \
+      org.opencontainers.image.license="CC-BY-NC-4.0" \
+      license="CC-BY-NC-4.0"
+ENTRYPOINT ["python", "-m", "yue2_gfx1151"]
+CMD ["--help"]
