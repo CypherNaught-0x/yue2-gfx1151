@@ -139,7 +139,7 @@ def download(args):
 
 
 def parser():
-    p = argparse.ArgumentParser(description="Experimental YuE2 gfx1151 port (CC BY-NC 4.0)")
+    p = argparse.ArgumentParser(description="Optimized YuE2 inference for AMD gfx1151 (CC BY-NC 4.0)")
     sub = p.add_subparsers(dest="command", required=True)
     q = sub.add_parser("generate", help="Explicit local models; optimized independent AR batch")
     for name in ("model", "vae", "request", "output"):

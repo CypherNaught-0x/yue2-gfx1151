@@ -1,186 +1,214 @@
-# YuE2 gfx1151 experimental optimization port
+# YuE2 for AMD gfx1151
 
-Portable, non-commercial YuE2 inference for AMD gfx1151 (Strix Halo).
-Vendors YuE2 0.1.6 at upstream commit
-`8e06871aa2e704d87ffb9bc71b5f5420f6813724`, with the measured
-`release-candidate-2` kernel changes. **Unofficial; not upstream AMD support.**
+Optimized, non-commercial YuE2 inference for AMD Strix Halo (`gfx1151`). This
+repository packages YuE2 0.1.6 with ROCm-focused AR and VAE speedups, independent
+batching for up to four songs, resumable generation, and strict artifact checks.
 
-## What changes
+> [!IMPORTANT]
+> This is an unofficial compatibility and performance port, not upstream AMD
+> support. It requires a coherent gfx1151 ROCm/PyTorch/Triton environment and is
+> licensed for non-commercial use under CC BY-NC 4.0.
 
-- Length-aware Triton GQA decode attention with future-cache exclusion.
-- FP32-accumulating AR GEMV, rounding-preserving RMSNorm, fused projections.
-- Independent AR batches of 1–4 requests at CFG=1; independent RNG/history/EOS.
-- MIOpen FAST solver selection before HIP initialization, reusable FP32 VAE,
-  fused SnakeBeta, core 1024 / halo 16, deterministic decoding and TF32 off.
-- Native NAR midpoint solver remains **32 steps** by default, without quantization.
-  AR batches; NAR and VAE remain sequential within the process.
+## Performance at a glance
 
-AR numerical differences can change sampling, score length and song duration.
-**Same seed does not mean identical samples or equivalent musical quality.**
-No audio, weights, recordings or personal requests are redistributed here.
+Measured locally on a Radeon 8060S with Torch
+`2.13.0a0+rocm7.13.0a20260422` and HIP `7.13.26154`:
 
-## Measured performance (historical local campaign)
+| Workload | Generated audio | Generation time | Real-time factor |
+| --- | ---: | ---: | ---: |
+| One full song | 224.759 s | 352.408 s | 1.568× |
+| Four-song batch | 840.315 s total | 891.344 s | 1.061× aggregate |
 
-Hardware: AMD Radeon 8060S / gfx1151. Selected coherent runtime:
-Torch `2.13.0a0+rocm7.13.0a20260422`, HIP `7.13.26154`.
-These are previous measurements of the vendored kernel candidate, **not measurements
-of a freshly built public image or this portable adapter**.
+The four-song result is close to real-time aggregate throughput. Against the
+earlier local deployment, the final batch campaign measured about **16.1× higher
+duration-normalized throughput**. This is not a same-waveform benchmark: optimized
+AR kernels can change sampled tokens, song length, and output audio even with the
+same seed.
 
-| Configuration | Generated audio | Wall time incl. setup/artifacts | Wall / audio |
-|---|---:|---:|---:|
-| Historical baseline, three songs | Different earlier outputs | 45.8–74.7 min/song | 17.097× aggregate |
-| Triton attention + optimized VAE, four full songs | 807.475 s | 1161.479 s | 1.438× |
-| Full Triton AR + optimized VAE, one full song | 224.759 s | 352.408 s | 1.568× |
-| Full Triton AR + optimized VAE, four full songs | 840.315 s | 891.344 s | 1.061× |
+Component measurements explain most of the gain:
 
-The final historical duration-normalized aggregate improvement is approximately
-16.12×, **not a same-waveform controlled speedup or fourfold latency reduction**.
-The four-request candidates retained requests/seeds and native budgets/32-step
-solver, but generated different durations. Private inputs are not included, so
-these historical song numbers cannot be independently reproduced from this repo.
-Use your own requests and the public synthetic benchmarks for new measurements.
+- **VAE:** a 197.399-second latent decoded in 6.661 seconds on the warm optimized
+  path. The matched stock/optimized waveform comparison had RMS error `2.326e-7`.
+- **AR decode:** approximately 46 / 84 / 138 aggregate tokens/s at batch sizes
+  1 / 2 / 4 in repeated real-prefix tests.
+- **Independent batching:** a short four-request AR comparison took 4.207 seconds
+  batched versus 14.809 seconds sequentially (3.52×).
 
-| Controlled component evidence | Result | Qualification |
-|---|---|---|
-| 10 s VAE, stock warm → FAST warm → FAST/fused warm | 2.905 → 0.408 → 0.329 s | Same saved latent; solver/fusion comparison |
-| 197.399 s VAE, FAST stock / fused warm | 8.354 / 6.661 s | Fused cold 14.395 s; old historical decode 912.933 s |
-| Full VAE fused vs new stock | RMS error 2.326e-7; max 1.827e-5 | Peak allocation 5.574 GiB for this VAE test only |
-| Real-prefix AR throughput, batch 1 / 2 / 4 | ~46 / 84 / 138 aggregate tokens/s | Short repeated decode tests, not full-pipeline rate |
-| AR GEMV argmax agreement | 93.75–96.875% | Not sample-identical to compared SDPA stack |
-| Short distinct-request AR batch / sequential | 4.207 / 14.809 s (3.52×) | Attention-only test; not full-song wall |
+NAR and VAE currently run sequentially per request. NAR remains the largest
+remaining bottleneck; the native 32-step midpoint solver is intentionally kept
+for quality stability.
 
-NAR accounted for 64.74% of final four-song wall time. An experimental hipBLASLt
-NAR path saved 9.02% on one full solve but changed latent/waveform relative RMS
-by 3.53% / 4.42%; **not enabled here**. Full-pipeline peak GPU allocation was not
-collected. Modern ROCm is selected for coherent operation, not credited with the
-kernel speedup. Listening quality and note-by-note fidelity remain unverified.
+## How the speedups work
 
-## Install without replacing ROCm Torch
+The optimized launcher enables five coordinated changes:
 
-Linux, Python 3.10+, matched gfx1151 ROCm Torch/Triton and working `/dev/kfd` are
-required for generation. The package deliberately does not depend on PyPI Torch.
-On a validated GPU environment:
+1. **Length-aware Triton GQA attention** reads each row's effective KV length and
+   excludes unused future-cache entries without a dense visibility mask.
+2. **FP32-accumulating Triton GEMV** accelerates token-at-a-time AR linear layers
+   while preserving BF16 output constraints.
+3. **Rounding-preserving RMSNorm and fused projections** reduce AR memory traffic
+   without changing the model's expected intermediate BF16 rounding pattern.
+4. **Independent AR batching** gives each request its own RNG, history, position,
+   EOS state, and token budget. Batch sizes 1–4 are supported at CFG=1.
+5. **Optimized VAE decoding** selects MIOpen FAST before HIP initialization, reuses
+   the loaded decoder, tiles with a 1024-frame core and 16-frame halo, and uses a
+   fused FP32 SnakeBeta kernel.
+
+At a high level, generation is:
+
+```text
+request(s) -> planning/prefill -> batched AR decode -> sequential NAR
+           -> sequential optimized VAE -> FLAC + manifests -> verification
+```
+
+The CLI sets `MIOPEN_FIND_MODE=FAST`, `YUE2_AR_ATTENTION=triton`,
+`YUE2_AR_LINEAR=triton`, `YUE2_AR_NORM=triton`, and
+`YUE2_AR_FUSE_PROJECTIONS=1` before model initialization. `--sequential` disables
+multi-request AR batching for comparison or troubleshooting.
+
+## Requirements
+
+- Linux on an AMD `gfx1151` GPU with working `/dev/kfd` access
+- Python 3.10+
+- A matched ROCm, PyTorch, and Triton stack with BF16 support
+- Approximately 48 GiB of model-loading budget by default
+- Local YuE2-3B and YuE2-VAE snapshots
+
+Do **not** mix host ROCm libraries with a different PyTorch ROCm userspace. Device
+enumeration alone is not enough: validate a real BF16 GPU operation before loading
+the model. The project intentionally has no PyPI Torch dependency so an installer
+cannot silently replace a working gfx1151 build.
+
+## Native setup
+
+Start inside a coherent, already validated ROCm Python environment:
 
 ```bash
+git clone https://github.com/CypherNaught-0x/yue2-gfx1151.git
+cd yue2-gfx1151
+
+# Install the reviewed direct runtime pins without resolving/replacing Torch.
+python -m pip install --no-deps -r requirements-runtime.txt
 python -m pip install --no-deps .
-# Inspect/install the exact non-Torch pins in requirements-runtime.txt;
-# do not let an unconstrained resolver replace your coherent ROCm stack.
 yue2-gfx1151 --help
 ```
 
-CLI parsing, dry-run and CPU source tests use only the standard library.
-Runtime dependency pins are in `requirements-runtime.txt`. Transitive dependencies,
-Torch/Triton and ROCm come from your selected coherent environment; this is not a
-universal lockfile. `pip install .[runtime]` may resolve Torch through accelerate:
-**do not use it without protecting the existing GPU stack**.
+The direct pins are not a universal environment lockfile; your base environment
+must provide their compatible transitive dependencies. Avoid `pip install
+.[runtime]` unless you have explicitly protected the existing ROCm Torch stack.
 
-## Download explicit pinned snapshots
-
-Install `huggingface-hub==0.36.2` in an appropriate download environment:
+Download immutable model snapshots to explicit directories:
 
 ```bash
-yue2-gfx1151 download-models --model "$HOME/models/YuE2-3B" --vae "$HOME/models/YuE2-Vae"
+yue2-gfx1151 download-models \
+  --model "$HOME/models/YuE2-3B" \
+  --vae "$HOME/models/YuE2-Vae"
 ```
 
-Requires fresh separate output directories. Pins:
+Pinned revisions:
+
 - `m-a-p/YuE2-3B@1a96eca688d6ae5d7f0feb88573fec89920fcd19`
 - `m-a-p/YuE2-Vae@95535e72a97bc0f09b8ada125d26b4009428c0e8`
 
-Weights are separate downloads under their own terms. Loading uses the reviewed
-vendored implementation, not arbitrary downloaded Python code. Local model hashes
-and configuration identities are recorded for generation/resume.
+Weights remain separate downloads under their own terms. The launcher records
+model/config/tokenizer identities in each campaign manifest.
 
-## Generate
+## Generate and verify
+
+Run a dry-run first, then use a fresh output directory for generation:
 
 ```bash
 yue2-gfx1151 generate \
-  --model "$HOME/models/YuE2-3B" --vae "$HOME/models/YuE2-Vae" \
-  --request examples/request.json --output "$HOME/yue2-results/example" --dry-run
-# Remove --dry-run for a complete native generation.
-# Add --smoke only for a deliberately truncated ~8-second technical test.
+  --model "$HOME/models/YuE2-3B" \
+  --vae "$HOME/models/YuE2-Vae" \
+  --request examples/request.json \
+  --output "$HOME/yue2-results/example" \
+  --dry-run
+
+# Remove --dry-run for a complete generation.
+# Use --smoke only for a deliberately truncated ~8-second pipeline check.
 ```
 
-Request JSON is one object or a list of 1–4 objects, with unique simple `id`,
-`style`, `lyrics`, optional `cot`, `seed`, inline `abc`, and CFG=1 only.
-The generic instrumental example contains no private song or lyrics. Supplied ABC
-can guide generation but does not guarantee exact score fidelity or duration.
-`--source DIR` optionally selects a tree containing `yue2/` or `src/yue2/`;
-defaults to the installed vendored package, not a frozen host path.
-
-`--sequential` disables independent AR batching. `--generation-config FILE` accepts
-upstream GenerationConfig JSON; explicit changes to budgets/ODE steps invalidate
-comparisons with the default measurements. `--budget` defaults to 48 GiB, which is
-a loading budget, not a measured peak or guarantee of fit. Requests/output/model
-paths must not overlap. Output must be fresh unless `--resume` is supplied.
-
-Resume requires matching requests, source/launcher hashes, model/config/tokenizer
-hashes, runtime, execution mode and budgets. Stage hashes are verified before
-reuse. Do not edit checkpoints. All jobs on the same physical GPU should share
-`--gpu-lock PATH` (or `YUE2_GPU_LOCK`); the default serializes this user's direct
-CLI invocations, not unrelated applications or separately isolated containers.
+The request file can contain one object or a list of up to four objects. Each
+request has a unique `id`, `style`, `lyrics`, and optional `cot`, `seed`, `abc`,
+and `cfg_scale`; the optimized path supports CFG=1 only.
 
 ```bash
 yue2-gfx1151 verify "$HOME/yue2-results/example" --expected 1
 ```
 
-Generation runs this full artifact/hash/48kHz stereo/non-silence validation too.
-Signal checks are not listening acceptance. Truncated smoke needs
-`verify ... --allow-truncated` and must not be presented as a full song.
-Generated manifests contain the request and local identities; keep outputs private.
+Verification checks campaign identity, stage and artifact hashes, complete FLAC
+decoding, 48 kHz stereo format, finite samples, and non-silence. It is a technical
+gate, not a listening-quality judgment. Smoke outputs require
+`--allow-truncated` when verified separately.
 
-## Optional container
+### Operational behavior
 
-See [container setup and public-base caveats](docs/container.md).
-There is **no public default image claimed to reproduce the measured runtime**.
-`BASE_IMAGE` is mandatory; no unpublished local image is used as a hidden default.
+- Output directories must be fresh unless `--resume` is used.
+- Resume requires matching requests, source, model/config/tokenizer identities,
+  runtime, execution mode, budgets, and stage hashes.
+- `--gpu-lock PATH` serializes this CLI's jobs; use the same lock for every process
+  sharing the physical GPU.
+- `--generation-config FILE` accepts an upstream `GenerationConfig` JSON. Changed
+  token budgets or ODE steps are no longer comparable with the measurements above.
+- `--budget` is a loading budget, not a measured peak-memory guarantee.
+
+## Container setup
+
+The container layer is bring-your-own-base because no public image is claimed to
+reproduce the validated local ROCm stack. Supply a fully qualified, preferably
+digest-pinned base that already contains matched gfx1151 ROCm, PyTorch, Triton, and
+runtime dependencies:
 
 ```bash
-BASE_IMAGE='registry.example/your-validated-rocm-image@sha256:REPLACE' \
-  scripts/build-container.sh
+BASE_IMAGE='registry.example/validated-gfx1151@sha256:REPLACE' \
+  CONTAINER_ENGINE=podman scripts/build-container.sh
+
 mkdir -p "$HOME/yue2-results/container-example"
-scripts/run-container.sh --model "$HOME/models/YuE2-3B" \
-  --vae "$HOME/models/YuE2-Vae" --request examples/request.json \
-  --output "$HOME/yue2-results/container-example" --dry-run
+scripts/run-container.sh \
+  --model "$HOME/models/YuE2-3B" \
+  --vae "$HOME/models/YuE2-Vae" \
+  --request examples/request.json \
+  --output "$HOME/yue2-results/container-example" \
+  --dry-run
 ```
 
-Replace the placeholder with an actual coherent base you have validated.
-Build preserves the base GPU distributions, resets inherited application paths,
-and packages the source. Run mounts only explicit inputs/output, disables networking,
-and exposes no GPU devices for dry-run. GPU job serialization across containers is
-an operator responsibility; wrap the script in your shared host `flock`.
+The build preserves the base GPU packages and installs this project with
+`--no-deps`. The runtime mounts only explicit inputs and output, disables network
+access, and exposes `/dev/kfd` and `/dev/dri` only for real GPU generation. See
+[docs/container.md](docs/container.md) for the full base-image contract, Podman and
+Docker details, and hardware acceptance procedure.
 
-## Tests
+## Validation and benchmarks
 
 ```bash
 PYTHONPATH=src python -m unittest discover -s tests -v
 python -m unittest discover -s container -p 'test_*.py' -v
+python -m compileall -q src benchmarks tests
 ```
 
-CPU CI covers CLI validation, unsafe paths, pinned downloads using a mock,
-source provenance, dependency-free help and container argument construction.
-[GPU benchmarks](benchmarks/README.md) adapt the actual measured AR/VAE kernel
-shapes, include numerical gates and require explicit `--run-gpu`. Run them only
-with exclusive access; no GPU tests run automatically on generic GitHub runners.
-CPU passing does **not** establish kernel correctness on a new ROCm stack.
+CPU CI covers CLI validation, unsafe paths, pinned-download behavior, provenance,
+resume/verification rules, and container command construction. Opt-in GPU kernel
+correctness tests and microbenchmarks are documented in
+[benchmarks/README.md](benchmarks/README.md); they require `--run-gpu` and exclusive
+GPU access.
 
-## Packaged-image verification
+The packaged local image also completed the generic example to natural EOS:
+86.679 seconds of verified 48 kHz stereo audio in a 138.494-second generation
+attempt. Machine-readable details are in
+[docs/packaged-validation.json](docs/packaged-validation.json). This validates the
+tested local base, not an arbitrary public ROCm image.
 
-The reviewed installed package passed 38 CPU tests, 9 container-wrapper tests,
-and GitHub CI on Python 3.10/3.12. A separate GPU run in the rebuilt image produced
-the generic example to natural EOS: **86.679 seconds of 48 kHz stereo audio**,
-with both truncation flags false and campaign identity, artifact hashes and full
-FLAC decoding verified. Its recorded generation attempt was **138.494 seconds**
-(not total container startup/weight-hashing wall time). See
-[machine-readable evidence](docs/packaged-validation.json) and
-[container acceptance details](docs/container.md#reviewed-image-hardware-check).
+## Scope and provenance
 
-This validates the operator-local coherent base, **not a fresh publicly
-downloadable base**. Subjective listening is not claimed.
+The vendored source is based on YuE2 0.1.6 at upstream commit
+`8e06871aa2e704d87ffb9bc71b5f5420f6813724`. No model weights, audio, recordings,
+or personal requests are included. Optimized AR numerics can alter sampling, so
+same-seed output identity and subjective musical equivalence are not claimed.
 
-## License and attribution
+## License
 
-**CC BY-NC 4.0** for the YuE2 derivative; non-commercial only. See [LICENSE](LICENSE),
+The YuE2 derivative is **CC BY-NC 4.0** and non-commercial. See [LICENSE](LICENSE),
 [NOTICE](NOTICE.md), [MODEL_LICENSE](MODEL_LICENSE), and
-[third-party notices](THIRD_PARTY_NOTICES.md). Upstream: YuE by HKUST / M-A-P.
-Retain attribution and identify modifications. MIT third-party portions keep their
-original terms. No rights to input recordings or lyrics are implied.
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Retain attribution and identify
+modifications. Upstream: YuE by HKUST / M-A-P.

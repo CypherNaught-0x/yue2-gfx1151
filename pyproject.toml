@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "yue2-gfx1151"
 version = "0.1.0"
-description = "Experimental non-commercial YuE2 gfx1151 optimization port"
+description = "Optimized non-commercial YuE2 inference for AMD gfx1151"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "CC-BY-NC-4.0"
